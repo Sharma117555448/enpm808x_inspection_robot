@@ -2,19 +2,27 @@ cmake_minimum_required(VERSION 3.0.2)
 project(enpm808x_inspection_robot)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++11)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  gazebo_ros
   message_generation
   message_runtime
   roscpp
   rospy
   std_msgs
   tf
+  nav_msgs
+  geometry_msgs
+  move_base_msgs
+  sensor_msgs
 )
+
+
+find_package(gazebo REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -50,11 +58,13 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  inspect.msg
+  location.msg
+  array.msg
+  flag.msg
+  )
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -71,10 +81,10 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -106,9 +116,10 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+ INCLUDE_DIRS include
+ CATKIN_DEPENDS roscpp rospy std_msgs sensor_msgs geometry_msgs nav_msgs tf gazebo_ros message_runtime message_generation
+  DEPENDS GAZEBO
 #  LIBRARIES enpm808x_inspection_robot
-#  CATKIN_DEPENDS message_generation message_runtime roscpp rospy std_msgs tf
 #  DEPENDS system_lib
 )
 
@@ -116,11 +127,14 @@ catkin_package(
 ## Build ##
 ###########
 
+link_directories(${GAZEBO_LIBRARY_DIRS})
+
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
+  ${GAZEBO_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -136,7 +150,10 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/enpm808x_inspection_robot_node.cpp)
+add_executable(robot src/main.cpp src/robot.cpp)
+add_executable(pressure_detector src/PressureDetection.cpp)
+# add_executable(move_robot src/explore.py)
+# add_executable(robot src/main.cpp src/robot.cpp src/PressureDetection.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -149,9 +166,24 @@ include_directories(
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(${PROJECT_NAME}_node
-#   ${catkin_LIBRARIES}
+target_link_libraries(robot
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(pressure_detector
+${catkin_LIBRARIES}
+)
+# target_link_libraries(move_robot 
+# ${catkin_LIBRARIES}
 # )
+
+add_executable(subscriber src/subscriber.cpp)
+add_dependencies(subscriber ${cpp_python_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(subscriber
+   ${catkin_LIBRARIES}
+ )
+
+add_dependencies(pressure_detector enpm808x_inspection_robot_generate_messages_cpp)
+add_dependencies(robot enpm808x_inspection_robot_generate_messages_cpp)
 
 #############
 ## Install ##
@@ -187,6 +219,17 @@ include_directories(
 #   FILES_MATCHING PATTERN "*.h"
 #   PATTERN ".svn" EXCLUDE
 # )
+install(TARGETS robot
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+)
+
+install(DIRECTORY launch models rviz worlds 
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES
@@ -207,3 +250,10 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+
+if (CATKIN_ENABLE_TESTING)
+  find_package(rostest REQUIRED)
+  add_rostest_gtest(test_enpm808x_inspection_robot test/InspectionRobotTest.launch test/InspectionRobotTest.cpp)
+  target_link_libraries(test_enpm808x_inspection_robot ${catkin_LIBRARIES})
+endif()
