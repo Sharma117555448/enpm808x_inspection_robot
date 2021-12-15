@@ -1,0 +1,4 @@
+<launch>
+    <node pkg="enpm808x_inspection_robot" type="InspectionRobotTest" name="InspectionRobotTest" output = "screen"/>
+    <test test-name="test_enpm808x_inspection_robot" pkg="enpm808x_inspection_robot" type="test_enpm808x_inspection_robot" />
+</launch>
